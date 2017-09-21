@@ -1,0 +1,105 @@
+<project name="otis" default="build">
+
+  <!-- Configuration -->
+
+  <property name="config-file" location="build.config"/>
+  <property name="config-default" location="build.default"/>
+
+  <target name="config">
+    <!-- load configuration file -->
+    <property file="${config-file}"/>
+
+    <!-- define global build properties -->
+    <property name="java-classes" location="classes"/>
+    <property name="java-src" location="sources"/>
+
+  </target>
+
+  <target name="config-init" unless="config-exists" depends="config-check">
+    <!-- if needed initialize site config using default config -->
+    <copy file="${config-default}"
+          tofile="${config-file}"
+          flatten="true"
+          verbose="true"/>
+  </target>
+
+  <target name="config-check">
+    <!-- check whether a site config file already exists -->
+    <condition property="config-exists">
+      <length file="${config-file}" when="greater" length="0"/>
+    </condition>
+  </target>
+
+  <!-- Build -->
+
+  <target name="build" depends="java-jars">
+
+  </target>
+
+
+  <!-- Java -->
+
+
+
+  <target name="java-compile" depends="config">
+
+    <javac srcdir="${java-src}"
+           destdir="${java-classes}"
+           debug="on"
+           debuglevel="lines,vars,source"
+           fork="on"
+	       listfiles="yes"
+           memoryMaximumSize="512m"
+           includeantruntime="false">
+        <classpath path="jars/fits.jar"/>
+	    <compilerarg value="-Xlint:unchecked"/>
+    </javac>
+
+    <copy todir="${java-classes}" verbose="true">
+      <fileset dir="${java-src}">
+        <exclude name="**/*.java*"/>
+      </fileset>
+    </copy>
+
+  </target>
+
+  <target name="java-jars" depends="java-compile">
+
+    <!-- otis_installer.jar -->
+
+    <jar destfile="sky.jar" update="true">
+      <manifest>
+        <attribute name="Main-Class" value="eap.sky.test.Test"/>
+        <attribute name="Class-Path" value="fits.jar plot.jar"/>
+      </manifest>
+
+      <fileset dir="${java-classes}">
+
+        <include name="**"/>
+
+      </fileset>
+
+    </jar>
+
+
+
+  </target>
+
+
+  <target name="run" depends="build">
+
+      <java classpath="most.jar:jars/fits.jar"
+            classname="com.oceanit.test.Test"
+            fork="true"/>
+
+  </target>
+
+  <target name="docs" depends="java-compile">
+      <javadoc sourcepath="sources"
+               destdir="docs"
+               classpath="classes"
+               overview="overview.html"/>
+
+  </target>
+
+</project>

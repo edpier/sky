@@ -1,0 +1,45 @@
+<body>
+This is a comprehensive high accuracy positional astronomy library. 
+Positional astronomy deals with determining the positions of astronomical
+objects in the sky - typically the apparent positions as seen by an observer
+on the Earth. To do this accurately you need to account for a number of 
+factors including the position of the observer on the Earth, the shape
+of the Earth, atmospheric refraction, the orientation of the Earth in space,
+The effect of the Earth's motion through space, including special relativistic
+effects, general relativistic deflection of light by the sun. In addition, you
+need to accurately measure time and predict the positions of bodies in the
+solar system.
+<p>
+Positional astronomy and this library are useful for sky
+visualization (e.g. planetarium programs), pointing telescopes, observation
+planning, and more.
+<p>
+The state of the art for positional astronomy gives microarcsecond accuracy,
+and is laid out in a set of models and conventions adopted by the International
+Astronomical Union (IAU) in 2000. This library is fully compliant with the 
+IAU 2000 conventions but has a pluggable architecture so that you can
+trade computational speed for accuracy when needed. 
+<p>
+This library has many packages but the following are good starting places to 
+learn about the capabilities of eap.sky .
+<p>
+The {@link eap.sky.time} package extends Java's Date class to provide nanosecond
+precision and support for the myriad of timekeeping systems used in positional
+astronomy.<p>
+
+The {@link eap.sky.earth} package computes the precise orientation of the
+Earth in space, including precession, nutation, rotation, and polar motion.<p>
+ 
+The {@link eap.sky.util} package handles the mechanics of spherical coordinates,
+transforms, and projections, while {@link eap.sky.util.coordinates} handles
+specific coordinate systems, such as RA/Dec and Az/Alt.<p>
+
+The {@link eap.sky.ephemeris} package is for determining the positions of
+bodies in the solar system. It supports the JPL DE405 ephemeris, which represents
+the current state of the art in accuracy.<p>
+
+The {@link eap.sky.stars} package handles star catalogs. The catalogs are arranged into
+hierarchical tessellations of the sky which can be searched in log time. This
+way eap.sky can handle even extremely large catalogs efficiently.<p>
+
+</body>

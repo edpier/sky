@@ -1,0 +1,268 @@
+// Copyright 2012 Edward Alan Pier
+//
+// This file is part of eap.sky
+//
+// eap.sky is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// eap.sky is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with eap.sky.  If not, see <http://www.gnu.org/licenses/>.
+
+package eap.sky.time.clock;
+
+import eap.sky.time.*;
+
+
+
+/****************************************************************************
+* A clock which is synchronized to another.
+****************************************************************************/
+public class SynchronizedClock implements Clock {
+
+Clock clock;
+
+double accuracy;
+double offset;
+
+boolean synched;
+
+
+long synch_interval;
+
+SynchThread thread;
+
+/****************************************************************************
+* Creates a a clock which will synchronize once per hour.
+* @see #SynchronizedClock(Clock, long)
+****************************************************************************/
+public SynchronizedClock(Clock clock) {
+
+    this(clock, 1000*60);
+
+} // end of default constructor
+
+/****************************************************************************
+* Creates a clock which will resynchronize at a given
+* interval. Note the constructor makes one synch attempt before it returns.
+* But if that attempt fails, the clock will just return the local system
+* time. You can use {@link #isSynchronized()} to catch this.
+* @param synch_interval The time between sychronization attempts in
+*        milliseconds. If this is <= 0. the clock will make one attempt to
+*        synchronize, but will never resynchronize.
+****************************************************************************/
+public SynchronizedClock(Clock clock, long synch_interval) {
+
+    this.clock = clock;
+    this.synch_interval = synch_interval;
+
+    /***********************************************
+    * force a synch before the constructor returns *
+    ***********************************************/
+    offset = 0.0;
+    accuracy = 0.0;
+    synched = false;
+    synch();
+
+
+    /************************
+    * start the synch thread *
+    *************************/
+    if(synch_interval >0) {
+        thread = new SynchThread();
+        thread.start();
+    }
+
+} // end of lax constructor
+
+/****************************************************************************
+*
+****************************************************************************/
+private void synch() {
+
+    /**************************************************************
+    * query the remote clock, bracketed by calls to the local clock *
+    **************************************************************/
+    long before=0;
+    long after=0;
+    PreciseDate remote = null;
+
+    try {
+        before = System.currentTimeMillis();
+        remote =  clock.currentTime();
+        after  = System.currentTimeMillis();
+
+    } catch(Exception e) { e.printStackTrace(); }
+
+    /***************************************
+    * set the accuracy to half the latency *
+    ***************************************/
+    double accuracy = (double)(after-before)/2000.0;
+
+    /********************************************
+    * abort the sync if the remote call failed
+    * or if it took too long
+    ********************************************/
+    if(remote == null || accuracy > 0.01) {
+        synched = false;
+        return;
+    }
+
+
+    /***************************************************
+    * Convert the mean of the bracketed times
+    * to a date. We don't sweat the half a millisecond
+    ***************************************************/
+    PreciseDate local = UTCSystem.getInstance().createDate();
+    local.setTime((before+after)/2l, 0);
+
+
+    /*************************************************************
+    * calculate the offset
+    * we set the offset to zero if it is within the accuracy
+    * to account for the case where the local clock is already
+    * synced better than we can do here (e.g. by NTP).
+    ************************************************************/
+    double offset = remote.secondsAfter(local);
+    if(Math.abs(offset) <= accuracy) offset = 0.0;
+
+    /****************************
+    * accept the current values *
+    ****************************/
+    this.offset = offset;
+    this.accuracy = accuracy;
+    synched = true;
+
+} // end of synch method
+
+/****************************************************************************
+*
+****************************************************************************/
+public PreciseDate currentTime() {
+
+    /***********************************************************
+    * get the current time according to the local system clock *
+    ***********************************************************/
+    PreciseDate time = UTCSystem.getInstance().createDate();
+    time.setTime(System.currentTimeMillis(), 0);
+
+    /***********************************************
+    * apply the offset to sync to the source clock *
+    ***********************************************/
+    time.increment(offset);
+
+    return time;
+
+} // end of currentTime method
+
+/***************************************************************************
+* Returns the offset between the source clock and the local system clock.
+* A positive value means the local clock reads a time easiler than the
+* sorce clock.
+* @return The source clock time minus the system clock time in seconds.
+***************************************************************************/
+public double getOffset() { return offset; }
+
+/****************************************************************************
+* Returns an estimate of the accuracy of the synchronization.
+* This is actually half of the time required to make a call to the source clock,
+* which is usually dominated by network latency on remote systems.
+* This value may be a large overestimate on remote machines, but could be
+* a small underestimate on local machines.
+* @return An estimate of the synchronization accuracy in seconds
+****************************************************************************/
+public double getAccuracy() { return accuracy; }
+
+/****************************************************************************
+* Returns true if the last attempt to synchronize the clock was sucessful.
+* Note that the constructor makes one
+****************************************************************************/
+public boolean isSynchronized() { return synched; }
+
+/****************************************************************************
+* Causes the synch thread to exit if one is running.
+* Note that a synched clock will not be garbage collected if it's synch thread
+* is still running. The thread is guaranteed to be dead by the time
+* this method exits, unless the thread calling this method is interrupted.
+* {@link #isSynchronized()} will always return false after you call
+* this method.
+****************************************************************************/
+public synchronized void stopSynch() {
+
+    /*******************************************************************
+    * Note that the thrtead is only created in the constructor
+    * so we don't have to worry about one being created
+    * after we check that it is null.
+    * We synchronize this method to prevent the thread from being
+    * destroyed after we check that it is not null.
+    ******************************************************************/
+    if(thread != null) thread.quit();
+    thread = null;
+
+    synched = false;
+
+} // end of stop method
+
+
+/****************************************************************************
+*
+****************************************************************************/
+private class SynchThread extends Thread {
+
+boolean keep_going;
+
+/***********************************************************************
+*
+***********************************************************************/
+public SynchThread() {
+
+    super("ClockSynch");
+    setDaemon(true);
+
+} // end of constructor
+
+/***********************************************************************
+*
+***********************************************************************/
+public void quit() {
+
+    keep_going = false;
+    interrupt();
+
+    try {join();}
+    catch(InterruptedException e) {}
+
+} // end of quit method
+
+/***********************************************************************
+*
+***********************************************************************/
+public void run() {
+
+    keep_going = true;
+    while(keep_going) {
+
+        /*************************************
+        * sleep until it's time to try again *
+        *************************************/
+        try { sleep(synch_interval); }
+        catch(InterruptedException e) { break; }
+
+        /***********************
+        * redo the clock synch *
+        ***********************/
+        synch();
+
+    } // end of loop
+
+} // end of run method
+
+} // end of SynchThread inner class
+
+} // end of SynchedClock class
