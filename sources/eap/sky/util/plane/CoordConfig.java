@@ -150,6 +150,71 @@ public static CoordConfig createSimple(int width, int height,
 } // end of createSimple method
 
 /**************************************************************************
+* @param arcsec_per_pixel The plate scale ("/pixel)
+**************************************************************************/
+public static CoordConfig createUnbounded(double arcsec_per_pixel) {
+
+    CoordConfig config = new CoordConfig();
+
+    /********************
+    * some calculations *
+    ********************/
+    double radians_per_pixel = arcsec_per_pixel/206265.0;
+
+
+    /*********************
+    * TANGET coordinates *
+    *********************/
+    PlaneCoordinates coord = new PlaneCoordinates("TANGENT", null);
+    config.add(coord);
+
+    Shape bounds = new InfinitePlane();
+
+    PlaneSegment seg = new PlaneSegment(coord, "TAN", null, bounds, null, null);
+    seg.setSegmentLayout(new IrregularLayout(seg));
+
+    /**********************
+    * ROTATED coordinates *
+    **********************/
+    PlaneCoordinates parent_coord = coord;
+    PlaneSegment parent_seg = seg;
+
+    coord = new PlaneCoordinates("ROTATED", parent_coord);
+    config.coordinates.put(coord.getName(), coord);
+
+    bounds = new InfinitePlane();
+
+    Point2D center = new Point2D.Double(0.0, 0.0);
+    PlaneTransform trans = new  RotatorTransform(center, center, "rotator",
+                                                 false, 0.0);
+    config.addParameter("rotator");
+    seg = new PlaneSegment(coord, "ROT", parent_seg, bounds, trans, null);
+    seg.setSegmentLayout(new IrregularLayout(seg));
+
+    /********************
+    * FOCAL coordinates *
+    ********************/
+    parent_coord = coord;
+    parent_seg = seg;
+
+    coord = new PlaneCoordinates("FOCAL", parent_coord);
+    config.add(coord);
+
+    bounds = new InfinitePlane();
+
+    trans = new AffinePlaneTransform(
+            new AffineTransform(radians_per_pixel, 0.0,
+                                0.0, radians_per_pixel,
+                                0.0, 0.0));
+
+    seg = new PlaneSegment(coord, "FOCAL", parent_seg, bounds, trans, null);
+    seg.setSegmentLayout(new IrregularLayout(seg));
+
+    return config;
+
+} // end of createUnbounded method
+
+/**************************************************************************
 * Create a new copy of the parameter set for these coordinates.
 **************************************************************************/
 public ParameterSet createParameterSet() { return params.copy(); }

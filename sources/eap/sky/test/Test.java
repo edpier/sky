@@ -58,20 +58,13 @@ public class Test {
 public static boolean initTime() {
 
     ClassLoader loader = Test.class.getClassLoader();
+    
+    File data_dir = new File(System.getProperty("user.dir"), data);
 
 
-    URL leapsec = loader.getResource("eap/sky/test/tai-utc.dat");
-    URL eop_url = loader.getResource("eap/sky/test/finals2000A.all");
+    URL leapsec = new File(data_dir, "tai-utc.dat").toURI().toURL();
+    URL eop_url = new File(data_dir, "finals2000A.all").toURI().toURL();
 
-    if(leapsec == null) {
-        System.out.println("could not find leapsec file");
-        return false;
-    }
-
-    if(eop_url == null) {
-        System.out.println("could not find EOP table");
-        return false;
-    }
 
     /*****************
     * initialize UT1 *
